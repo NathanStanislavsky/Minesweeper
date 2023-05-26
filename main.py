@@ -4,6 +4,8 @@ import random
 board = []
 num_bombs = 0
 num_marked_correctly = 0
+first_click_made = False
+
 
 
 class Cube(object):
@@ -32,18 +34,19 @@ class Cube(object):
 
     def mark(self, surface):
         global num_marked_correctly
-        self.marked = True
-        pygame.draw.circle(surface, (255, 0, 0), (self.x + 10, self.y + 10), 4)
-        if self.is_bomb():
-            num_marked_correctly += 1
-    
+        if self.get_starter():
+            self.marked = True
+            pygame.draw.circle(surface, (255, 0, 0), (self.x + 10, self.y + 10), 4)
+            if self.is_bomb():
+                num_marked_correctly += 1
 
     def unmark(self, surface):
         global num_marked_correctly
         self.marked = False
-        pygame.draw.circle(surface, (255, 198, 153), (self.x + 10, self.y + 10), 4)
+        pygame.draw.circle(surface, (144, 238, 144), (self.x + 10, self.y + 10), 4)
         if self.is_bomb():
             num_marked_correctly -= 1
+
     
 
 
@@ -104,8 +107,10 @@ def handle_click(cube):
                         if not adjacent_cube.is_clicked():
                             handle_click(adjacent_cube)
                 cube.draw(screen, (255, 198, 153))  # Update color of the clicked and revealed cube
+                cube.set_starter(False)
             else:
                 cube.draw(screen, (255, 198, 153), cube.bombs_adjacent())  # Update color and display number of adjacent bombs
+                cube.set_starter(False)
 
 
 
@@ -135,7 +140,33 @@ while not done:
         if event.type == pygame.QUIT:
             done = True
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:  # Left mouse button
+            if event.button == 1 and not first_click_made:  # Left mouse button and first click
+                mouse_pos = pygame.mouse.get_pos()
+                for cube in board:
+                    if cube.x <= mouse_pos[0] <= cube.x + 20 and cube.y <= mouse_pos[1] <= cube.y + 20:
+                        if cube.is_bomb() or cube.bombs_adjacent() != 0:  # If the first click is a bomb or adjacent to a bomb
+                            # Regenerate the board
+                            board = []  # Clear the existing board
+                            num_bombs = 0  # Reset the number of bombs
+                            num_marked_correctly = 0  # Reset the number of marked bombs
+                            for y in range(0, 400, 20):  # Recreate the board
+                                for x in range(0, 400, 20):
+                                    new_cube = Cube(x, y)
+                                    new_cube.set_starter(True)
+                                    rand_num = random.randrange(1, 10)
+                                    if rand_num > 8:
+                                        new_cube.create_bomb()
+                                        num_bombs += 1
+                                    board.append(new_cube)
+                            # Reset the first click flag
+                            first_click_made = False
+                            # Exit the loop to prevent further processing of the click event
+                            break
+                        else:
+                            handle_click(cube)
+                            first_click_made = True
+                            break
+            elif event.button == 1:  # Left mouse button (after the first click)
                 mouse_pos = pygame.mouse.get_pos()
                 for cube in board:
                     if cube.x <= mouse_pos[0] <= cube.x + 20 and cube.y <= mouse_pos[1] <= cube.y + 20:
@@ -154,12 +185,13 @@ while not done:
         text = font.render("You Win!", True, (255, 255, 255))
         # Fill the screen with black color
         screen.fill((0, 0, 0))
-        
+
         # Blit the text to the center of the screen
         text_rect = text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
         screen.blit(text, text_rect)
-        
+
         # Update the display
         pygame.display.update()
 
     pygame.display.flip()
+
